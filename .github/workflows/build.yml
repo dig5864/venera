@@ -1,6 +1,8 @@
 name: Build & Release
 
 on:
+  push:
+    branches: [CI]
   workflow_dispatch:
     inputs:
       platform:
@@ -50,6 +52,7 @@ jobs:
     name: "Android APK"
     needs: get-version
     if: |
+      github.event_name == 'push' ||
       github.event_name == 'release' ||
       github.event.inputs.platform == 'all' ||
       github.event.inputs.platform == 'android'
@@ -117,6 +120,7 @@ jobs:
     name: "iOS IPA"
     needs: get-version
     if: |
+      github.event_name == 'push' ||
       github.event_name == 'release' ||
       github.event.inputs.platform == 'all' ||
       github.event.inputs.platform == 'ios'
@@ -167,6 +171,7 @@ jobs:
     name: "macOS DMG"
     needs: get-version
     if: |
+      github.event_name == 'push' ||
       github.event_name == 'release' ||
       github.event.inputs.platform == 'all' ||
       github.event.inputs.platform == 'macos'
@@ -234,6 +239,7 @@ jobs:
     name: "Windows x64"
     needs: get-version
     if: |
+      github.event_name == 'push' ||
       github.event_name == 'release' ||
       github.event.inputs.platform == 'all' ||
       github.event.inputs.platform == 'windows'
@@ -274,6 +280,7 @@ jobs:
     name: "Linux x64"
     needs: get-version
     if: |
+      github.event_name == 'push' ||
       github.event_name == 'release' ||
       github.event.inputs.platform == 'all' ||
       github.event.inputs.platform == 'linux'
@@ -333,6 +340,7 @@ jobs:
     name: "Linux ARM64"
     needs: get-version
     if: |
+      github.event_name == 'push' ||
       github.event_name == 'release' ||
       github.event.inputs.platform == 'all' ||
       github.event.inputs.platform == 'linux-arm64'
