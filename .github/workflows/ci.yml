@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================
+  # 1. 代码格式检查
+  # ============================================================
+  format:
+    name: "Format Check"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version-file: pubspec.yaml
+          cache: true
+
+      - name: Check Dart format
+        run: dart format --set-exit-if-changed lib/ test/
+
+  # ============================================================
+  # 2. 静态分析
+  # ============================================================
+  analyze:
+    name: "Static Analysis"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version-file: pubspec.yaml
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run Dart analyzer
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+  # ============================================================
+  # 3. 单元测试 + 测试报告
+  # ============================================================
+  test:
+    name: "Unit Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version-file: pubspec.yaml
+          cache: true
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev
+
+      - name: Install Dart dependencies
+        run: flutter pub get
+
+      - name: Run Flutter tests
+        run: flutter test --reporter expanded --machine > test_report.json
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: test_report.json
+          retention-days: 30
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "## Test Results :test_tube:" >> $GITHUB_STEP_SUMMARY
+          PASSED=$(grep -c '"type":"testDone","result":"success"' test_report.json || echo 0)
+          FAILED=$(grep -c '"type":"testDone","result":"failure"' test_report.json || echo 0)
+          echo "| Status | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| :white_check_mark: Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
+          echo "| :x: Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================
+  # 4. 汇总检查结果（作为 PR 必要检查项）
+  # ============================================================
+  ci-status:
+    name: "CI Status"
+    needs: [format, analyze, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        run: |
+          if [[ "${{ needs.format.result }}" != "success" ]] || \
+             [[ "${{ needs.analyze.result }}" != "success" ]] || \
+             [[ "${{ needs.test.result }}" != "success" ]]; then
+            echo "❌ CI failed!"
+            exit 1
+          fi
+          echo "✅ All CI checks passed!"
